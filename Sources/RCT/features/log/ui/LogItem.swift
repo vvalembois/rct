@@ -9,7 +9,7 @@ import SwiftUI
 
 struct LogItem: View {
     
-    let log: Log
+    let log: LogEntry
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -33,18 +33,18 @@ struct LogItem: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.secondarySystemBackground)
         .cornerRadius(20)
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
-        LogItem(log: RCTMock.getMockLog(type: .info))
+        LogItem(log: LogEntry(type: .info, message: "Hello World", time: Date().timeIntervalSince1970, className: "Preview"))
         
-        LogItem(log: RCTMock.getMockLog(type: .warning))
+        LogItem(log: LogEntry(type: .warning, message: "Warning", time: Date().timeIntervalSince1970, className: "Preview"))
         
-        LogItem(log: RCTMock.getMockLog(type: .error))
+        LogItem(log: LogEntry(type: .error, message: "Error", time: Date().timeIntervalSince1970, className: "Preview"))
     }
     
 }

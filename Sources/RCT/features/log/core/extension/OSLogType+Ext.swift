@@ -20,7 +20,7 @@ extension OSLogType {
         }
     }
     
-    func toLogType() -> LogType {
+    func toLogType() -> LogEntryType {
         switch self {
         case .info:
             return .info

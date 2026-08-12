@@ -9,7 +9,6 @@ import Foundation
 
 #if os(iOS)
 import UIKit
-#endif
 
 extension UIWindow {
     override open func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
@@ -19,3 +18,5 @@ extension UIWindow {
         super.motionEnded(motion, with: event)
     }
 }
+
+#endif

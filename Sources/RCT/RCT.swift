@@ -20,14 +20,19 @@ public class RCT: @unchecked Sendable {
 
     fileprivate var presented: Bool = false
     
-    fileprivate var viewController: UIViewController?
+    #if os(iOS)
+        fileprivate var viewController: UIViewController?
+    #elseif os(macOS)
+        fileprivate var window: NSWindow?
+    #endif
     
-    public func start() {
+    
+    @MainActor public func start() {
         self.started = true
         NetworkManager.shared.start()
     }
     
-    public func stop() {
+    @MainActor public func stop() {
         self.started = false
         NetworkManager.shared.stop()
     }
@@ -37,7 +42,7 @@ public class RCT: @unchecked Sendable {
         toggleRCT()
     }
     
-    @MainActor fileprivate func toggleRCT() {
+    @MainActor public func toggleRCT() {
         if self.presented {
             hideRCT()
         } else {
@@ -45,36 +50,48 @@ public class RCT: @unchecked Sendable {
         }
     }
     
-    @MainActor fileprivate func hideRCT() {
+    @MainActor public func hideRCT() {
         if !self.presented {
             return
         }
         self.presented = false
-        self.viewController?.dismiss(animated: true)
+        closeWindow()
     }
     
-    fileprivate func showRCT() {
+    @MainActor public func showRCT() {
         if self.presented {
             return
         }
         self.presented = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self else { return } // safe unwrap
-            
-            let currentViewController = self.topViewController(UIApplication.shared.currentWindow?.rootViewController)
-            self.viewController = UIHostingController(rootView: TabBarView())
-            
-            // this tap gesture allows tabbaritem to be tappable
-            let gesture = UITapGestureRecognizer(target: self, action: nil)
-            gesture.cancelsTouchesInView = false
-            self.viewController?.view.isUserInteractionEnabled = true
-            self.viewController?.view.addGestureRecognizer(gesture)
-
-            currentViewController?.present(self.viewController ?? UINavigationController(), animated: true, completion: nil)
-        }
+        openWindow()
     }
     
-    @MainActor private func topViewController(_ controller: UIViewController?) -> UIViewController? {
+    public func setSensitiveKeys(_ sensitiveKeys: [String]) {
+        NetworkManager.shared.sensitiveKeys = sensitiveKeys
+    }
+}
+
+#if os(iOS)
+@MainActor
+extension RCT {
+    
+    private func closeWindow() {
+        self.viewController?.dismiss(animated: true)
+    }
+    
+    private func openWindow() {
+        let currentViewController = self.topViewController(UIApplication.shared.currentWindow?.rootViewController)
+        self.viewController = UIHostingController(rootView: TabBarView())
+        
+        let gesture = UITapGestureRecognizer(target: self, action: nil)
+        gesture.cancelsTouchesInView = false
+        self.viewController?.view.isUserInteractionEnabled = true
+        self.viewController?.view.addGestureRecognizer(gesture)
+
+        currentViewController?.present(self.viewController ?? UINavigationController(), animated: true, completion: nil)
+    }
+    
+    private func topViewController(_ controller: UIViewController?) -> UIViewController? {
         if let navigationController = controller as? UINavigationController {
             return topViewController(navigationController.visibleViewController)
         } else if let tabController = controller as? UITabBarController {
@@ -86,5 +103,43 @@ public class RCT: @unchecked Sendable {
         }
         return controller
     }
-    
 }
+#elseif os(macOS)
+import AppKit
+
+@MainActor
+extension RCT {
+    
+    private func openWindow() {
+        let contentView = NSHostingController(rootView: SplitView())
+        
+        let window = NSWindow(
+            contentViewController: contentView
+        )
+
+        window.setContentSize(NSSize(width: 800, height: 600))
+        window.center()
+        
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.isMovableByWindowBackground = true
+
+        window.styleMask = [
+            .titled,
+            .closable,
+            .resizable,
+            .miniaturizable,
+            .fullSizeContentView
+        ]
+        
+        window.makeKeyAndOrderFront(nil)
+        self.window = window
+    }
+    
+    private func closeWindow() {
+        self.window?.close()
+        self.window = nil
+    }
+}
+#endif

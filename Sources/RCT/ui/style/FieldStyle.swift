@@ -14,9 +14,9 @@ struct FieldView: View {
     let value: String
     
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title).font(.caption).bold()
-            Text(value).font(.caption).lineLimit(6)
+            Text(value).font(.body).lineLimit(6)
         }
     }
 }
@@ -35,7 +35,7 @@ struct FieldStyle: ViewModifier {
 }
 
 extension View {
-    func fieldStyle(color: Color = Color(.secondarySystemBackground)) -> some View {
+    func fieldStyle(color: Color = .secondarySystemBackground) -> some View {
         self.modifier(FieldStyle(color: color))
     }
 }
@@ -48,5 +48,4 @@ extension View {
     }
     .padding()
     .frame(height: .infinity)
-    .background(Color(.secondarySystemBackground))
 }

@@ -25,7 +25,7 @@ extension ApiCall {
 
 extension ApiCall {
     
-    func toCurl() -> String {
+    func toCurl(sensitiveKeys: [String] = NetworkManager.shared.sensitiveKeys) -> String {
         var finalURL = requestURL ?? ""
         if var components = requestURLComponents {
             if let queryItems = requestURLQueryItems {
@@ -40,15 +40,15 @@ extension ApiCall {
         var parts = ["curl -X \(method)"]
         
         if let headers = requestHeaders {
-            for (key, value) in headers {
+            for (key, value) in headers.maskingSensitiveKeys(sensitiveKeys) {
                 let safeValue = value.replacingOccurrences(of: "\"", with: "\\\"")
                 parts.append("-H \"\(key): \(safeValue)\"")
             }
         }
         
         if let body = requestBody, !body.isEmpty {
-            let escapedBody = body.replacingOccurrences(of: "\"", with: "\\\"")
-            parts.append("-d \"\(escapedBody)\"")
+            let escaped = body.maskingSensitiveKeys(sensitiveKeys).replacingOccurrences(of: "\"", with: "\\\"")
+            parts.append("-d \"\(escaped)\"")
         }
         
         parts.append("\"\(finalURL)\"")
@@ -57,7 +57,7 @@ extension ApiCall {
     }
     
     // swiftlint:disable cyclomatic_complexity
-    func toFullLogString() -> String {
+    func toFullLogString(sensitiveKeys: [String] = NetworkManager.shared.sensitiveKeys) -> String {
         var log = [String]()
 
         log.append("=== REQUEST ===")
@@ -75,11 +75,11 @@ extension ApiCall {
             log.append("QueryItems: \(queries)")
         }
         if let headers = requestHeaders, !headers.isEmpty {
-            let headerString = headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+            let headerString = headers.maskingSensitiveKeys(sensitiveKeys).map { "\($0.key): \($0.value)" }.joined(separator: "\n")
             log.append("Headers:\n\(headerString)")
         }
         if let body = requestBody, !body.isEmpty {
-            log.append("Body:\n\(body)")
+            log.append("Body:\n\(body.maskingSensitiveKeys(sensitiveKeys))")
         }
         if let date = requestDate {
             log.append("Request Date: \(date)")
@@ -115,7 +115,7 @@ extension ApiCall {
             try toFullLogString().write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            rct_log(.error, message: "Erreur création fichier: \(error)")
+            rct_log(.error, message: "Error creating file: \(error)")
             return nil
         }
     }

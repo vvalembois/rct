@@ -9,8 +9,35 @@ import Foundation
 import SwiftUI
 
 extension Color {
-    public static let background = Color("background", bundle: Bundle.module)
-    public static let backgroundContent = Color("background-content", bundle: Bundle.module)
-    public static let text = Color("text", bundle: Bundle.module)
-    public static let textcolor = Color("textcolor", bundle: Bundle.module)
+    static var systemBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
+    static var secondarySystemBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .secondarySystemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
+    }
+
+    static var tertiarySystemBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .tertiarySystemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .underPageBackgroundColor)
+        #endif
+    }
+
+    static var label: Color {
+        #if os(iOS)
+        Color(uiColor: .label)
+        #elseif os(macOS)
+        Color(nsColor: .labelColor)
+        #endif
+    }
 }

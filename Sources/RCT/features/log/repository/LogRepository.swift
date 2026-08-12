@@ -11,7 +11,7 @@ class LogRepository: ObservableObject {
     
     nonisolated(unsafe) static let shared = LogRepository()
     
-    @Published var logs: [Log] = [] {
+    @Published var logs: [LogEntry] = [] {
         didSet { saveLogs() }
     }
     
@@ -29,12 +29,12 @@ class LogRepository: ObservableObject {
     
     private func loadLogs() {
         guard let data = UserDefaults.standard.data(forKey: logKey) else { return }
-        if let decoded = try? JSONDecoder().decode([Log].self, from: data) {
+        if let decoded = try? JSONDecoder().decode([LogEntry].self, from: data) {
             logs = decoded
         }
     }
     
-    func addLog(_ log: Log) {
+    func addLog(_ log: LogEntry) {
         logs.append(log)
     }
     

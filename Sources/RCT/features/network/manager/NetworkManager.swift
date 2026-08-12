@@ -11,6 +11,8 @@ public class NetworkManager: @unchecked Sendable {
     
     static let shared: NetworkManager = .init()
     
+    var sensitiveKeys = [String]()
+    
     func start() {
         register()
         clearOldData()

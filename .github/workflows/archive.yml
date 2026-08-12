@@ -1,0 +1,110 @@
+name: Archive
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  workflow_run:
+    workflows: [ "Release" ]
+    types: [ completed ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  archive-and-release:
+    name: Build SPM Archive & Attach to Release
+    runs-on: macos-latest
+    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout (tag push)
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout (workflow_run)
+        if: github.event_name == 'workflow_run'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.1.0'
+
+      - name: Resolve tag (workflow_run only)
+        if: github.event_name == 'workflow_run'
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          TAG=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+
+          if [[ -z "$TAG" ]]; then
+            TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          fi
+
+          if [[ -z "$TAG" ]]; then
+            echo "No semver tag found to archive." >&2
+            exit 1
+          fi
+
+          git checkout "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Set TAG_NAME env
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "TAG_NAME=${{ steps.resolve.outputs.tag }}" >> "$GITHUB_ENV"
+          else
+            echo "TAG_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run unit tests
+        run: swift test
+
+      - name: Create source archives
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${TAG_NAME#v}"
+          BASE_NAME="RCT-${VERSION}-spm"
+          mkdir -p .build/archive
+
+          tar -czf ".build/archive/${BASE_NAME}.tar.gz" \
+            Package.swift README.md LICENSE Sources Tests .github/workflows
+
+          zip -r ".build/archive/${BASE_NAME}.zip" \
+            Package.swift README.md LICENSE Sources Tests .github/workflows
+
+          echo "BASE_NAME=${BASE_NAME}" >> "$GITHUB_ENV"
+
+      - name: Create or update GitHub Release and upload archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" \
+              ".build/archive/${BASE_NAME}.tar.gz" \
+              ".build/archive/${BASE_NAME}.zip" \
+              --clobber
+          else
+            gh release create "$TAG_NAME" \
+              --title "RCT $TAG_NAME" \
+              --generate-notes \
+              ".build/archive/${BASE_NAME}.tar.gz" \
+              ".build/archive/${BASE_NAME}.zip"
+          fi
