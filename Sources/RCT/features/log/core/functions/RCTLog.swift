@@ -8,8 +8,8 @@
 import os
 import OSLog
 
-public func rct_log(_ type: LogType = .info, context: Any? = nil, message: String) {
-    let log = Log(
+public func rct_log(_ type: LogEntryType = .info, context: Any? = nil, message: String) {
+    let log = LogEntry(
         type: type,
         message: message,
         time: NSDate().timeIntervalSince1970,
@@ -32,7 +32,7 @@ public func rct_log(_ type: LogType = .info, context: Any? = nil, message: Strin
 
 @available(*, deprecated, message: "Use rct_log(type: LogType, context: Any?, message: String) instead.")
 public func rct_log(type: OSLogType = .info, context: Any? = nil, message: String) {
-    let log = Log(
+    let log = LogEntry(
         type: type.toLogType(),
         message: message,
         time: NSDate().timeIntervalSince1970,

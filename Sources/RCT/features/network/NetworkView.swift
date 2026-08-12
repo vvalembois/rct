@@ -16,7 +16,7 @@ struct NetworkView: View {
         ScrollView {
             VStack(spacing: 20) {
                 ForEach(networkRepository.calls) { call in
-                    NavigationLink(destination: NetworkDetailView(apiCall: call)) {
+                    NavigationLink(value: call) {
                         NetworkItem(apiCall: call)
                             .padding(.horizontal)
                     }
@@ -25,24 +25,37 @@ struct NetworkView: View {
             }
             .padding(.vertical)
         }
-        .background(Color(.systemBackground))
-        .navigationBarTitle("Network", displayMode: .large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+        .platformNavigationTitle(MenuItem.network.title)
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        .platformToolbar(
+            navigationBarLeading: {
                 Button(
                     action: { RCT.sharedInstance().motionDetected() },
                     label: { Label("Close", systemImage: "xmark") }
                 )
-            }
+            },
             
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+            navigationBarTrailing: {
                 Button {
                     networkRepository.clear()
                 } label: {
                     Label("Clear", systemImage: "trash")
                 }
             }
-        }
+        )
+        #elseif os(macOS)
+        .listStyle(.inset)
+        .platformToolbar(
+            navigationBarTrailing: {
+                Button {
+                    networkRepository.clear()
+                } label: {
+                    Label("Clear", systemImage: "trash")
+                }
+            }
+        )
+        #endif
     }
 }
 

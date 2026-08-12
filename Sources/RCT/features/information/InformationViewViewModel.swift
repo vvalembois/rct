@@ -28,7 +28,7 @@ class InformationViewViewModel: ObservableObject {
             MySection(
                 name: "Application",
                 informations: [
-                    Information(key: "Nom", value: Bundle.main.infoDictionary?["CFBundleName"] ?? ""),
+                    Information(key: "Name", value: Bundle.main.infoDictionary?["CFBundleName"] ?? ""),
                     Information(key: "Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? ""),
                     Information(key: "Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] ?? "")
                 ]
@@ -38,12 +38,12 @@ class InformationViewViewModel: ObservableObject {
         #if canImport(UIKit)
         sections.append(
             MySection(
-                name: "Téléphone",
+                name: "Phone",
                 informations: [
-                    Information(key: "Nom", value: UIDevice.current.name),
-                    Information(key: "Version du logiciel", value: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"),
+                    Information(key: "Name", value: UIDevice.current.name),
+                    Information(key: "Software Version", value: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"),
                     Information(key: "Model", value: UIDevice.current.model),
-                    Information(key: "Nom du modéle", value: UIDevice.modelName)
+                    Information(key: "Model Name", value: UIDevice.modelName)
                 ]
             )
         )

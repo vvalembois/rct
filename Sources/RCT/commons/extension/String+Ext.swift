@@ -41,9 +41,70 @@ extension String {
             let prettyData = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted])
             return String(data: prettyData, encoding: .utf8) ?? self
         } catch {
-            print("❌ Invalid JSON:", error)
             return self
         }
+    }
+    
+    func maskingSensitiveKeys(_ sensitiveKeys: [String] = []) -> String {
+        var result = self
+
+        let separators: CharacterSet = [
+            "&", "\n", "{", "}", ",", "\""
+        ]
+
+        for key in sensitiveKeys {
+            let patterns = [
+                "\(key)=",
+                "\(key) =",
+                "\(key):",
+                "\(key) :"
+            ]
+
+            // On traite les occurrences de droite à gauche.
+            for pattern in patterns {
+                var matches: [Range<String.Index>] = []
+                var searchStart = result.startIndex
+
+                while searchStart < result.endIndex,
+                      let range = result.range(
+                        of: pattern,
+                        options: [.caseInsensitive],
+                        range: searchStart..<result.endIndex
+                      ) {
+                    matches.append(range)
+                    searchStart = range.upperBound
+                }
+
+                for keyRange in matches.reversed() {
+                    var valueStart = keyRange.upperBound
+
+                    // Ignore les espaces après "=" ou ":"
+                    while valueStart < result.endIndex,
+                          result[valueStart] == " " {
+                        valueStart = result.index(after: valueStart)
+                    }
+
+                    var valueEnd = result.endIndex
+
+                    for index in result.indices[valueStart...] {
+                        if let scalar = result[index].unicodeScalars.first,
+                           separators.contains(scalar) {
+                            valueEnd = index
+                            break
+                        }
+                    }
+
+                    if valueStart < valueEnd {
+                        result.replaceSubrange(
+                            valueStart..<valueEnd,
+                            with: "****"
+                        )
+                    }
+                }
+            }
+        }
+
+        return result
     }
     
     func toImage() -> Image? {

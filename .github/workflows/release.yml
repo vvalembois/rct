@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version semver optionnelle (ex: 1.2.3 ou v1.2.3)"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create Semver Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute release tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+
+          requested_version="${{ github.event.inputs.version }}"
+          requested_version="$(echo "$requested_version" | xargs)"
+          current_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+
+          if [[ -n "$requested_version" ]]; then
+            if [[ "$requested_version" =~ ^v ]]; then
+              next_tag="$requested_version"
+            else
+              next_tag="v$requested_version"
+            fi
+
+            if ! [[ "$next_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid version format: $next_tag" >&2
+              echo "Expected format: 1.2.3 or v1.2.3" >&2
+              exit 1
+            fi
+          else
+            if [[ -z "${current_tag}" ]]; then
+              next_tag="v1.0.0"
+            else
+              version="${current_tag#v}"
+              IFS='.' read -r major minor patch <<< "${version}"
+              next_minor=$((minor + 1))
+              next_tag="v${major}.${next_minor}.0"
+            fi
+          fi
+
+          existing_on_head=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          tag_exists=$(git tag --list "$next_tag" | head -n 1 || true)
+
+          should_create="true"
+          if [[ -n "$tag_exists" ]]; then
+            should_create="false"
+          fi
+
+          echo "requested_version=${requested_version}" >> "$GITHUB_OUTPUT"
+          echo "current_tag=${current_tag}" >> "$GITHUB_OUTPUT"
+          echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
+          echo "existing_on_head=${existing_on_head}" >> "$GITHUB_OUTPUT"
+          echo "tag_exists=${tag_exists}" >> "$GITHUB_OUTPUT"
+          echo "should_create=${should_create}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.version.outputs.should_create == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.next_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "### Release Tag"
+            echo ""
+            echo "- Requested version: ${{ steps.version.outputs.requested_version || 'none' }}"
+            echo "- Current latest tag: ${{ steps.version.outputs.current_tag || 'none' }}"
+            echo "- Computed next tag: ${{ steps.version.outputs.next_tag }}"
+            if [[ -n "${{ steps.version.outputs.tag_exists }}" ]]; then
+              echo "- Skipped: tag already exists (${{ steps.version.outputs.tag_exists }})"
+            else
+              echo "- Tag pushed: ${{ steps.version.outputs.next_tag }}"
+            fi
+            if [[ -n "${{ steps.version.outputs.existing_on_head }}" ]]; then
+              echo "- Existing semver tag already on this commit: ${{ steps.version.outputs.existing_on_head }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

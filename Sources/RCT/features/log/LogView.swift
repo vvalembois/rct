@@ -22,23 +22,34 @@ struct LogView: View {
             }
             .padding(.vertical)
         }
-        .listStyle(.plain)
-        .navigationBarTitle("Log", displayMode: .large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(
-                    action: { RCT.sharedInstance().motionDetected() },
-                    label: { Label("Fermer", systemImage: "xmark") }
-                )
-            }
-            
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+        .platformNavigationTitle(MenuItem.logs.title)
+        #if os(iOS)
+        .platformToolbar(
+            navigationBarLeading: {
                 Button {
-                    logRepository.clear()
+                    RCT.sharedInstance().motionDetected()
                 } label: {
-                    Label("Supprimer", systemImage: "trash")
+                    Label("Close", systemImage: "xmark")
                 }
+            },
+            navigationBarTrailing: {
+                clearButton
             }
+        )
+        #elseif os(macOS)
+        .platformToolbar(
+            navigationBarTrailing: {
+                clearButton
+            }
+        )
+        #endif
+    }
+    
+    var clearButton: some View {
+        Button {
+            logRepository.clear()
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
 }

@@ -7,7 +7,6 @@
 
 #if os(iOS)
 import UIKit
-#endif
 
 extension UIApplication {
     var currentWindow: UIWindow? {
@@ -18,3 +17,5 @@ extension UIApplication {
             .first { $0.isKeyWindow }
     }
 }
+
+#endif

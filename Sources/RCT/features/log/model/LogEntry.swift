@@ -9,9 +9,9 @@ import Foundation
 import OSLog
 import SwiftUI
 
-struct Log: Identifiable, Codable {
+struct LogEntry: Identifiable, Codable {
     let id = UUID()
-    var type: LogType
+    var type: LogEntryType
     var message: String
     var time: TimeInterval
     var className: String
@@ -35,7 +35,7 @@ struct Log: Identifiable, Codable {
     }
 }
 
-extension Log {
+extension LogEntry {
     
     func getImage() -> String {
         var systemImage = ""
@@ -62,10 +62,10 @@ extension Log {
     }
 }
 
-extension Log: Persistable {
+extension LogEntry: Persistable {
 
     init(managedObject: LogDao) {
-        self.type = LogType(rawValue: managedObject.type) ?? .error
+        self.type = LogEntryType(rawValue: managedObject.type) ?? .error
         self.message = managedObject.message
         self.time = managedObject.time
         self.className = managedObject.className
