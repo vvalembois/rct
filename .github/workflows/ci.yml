@@ -1,15 +1,14 @@
-name: Swift Linter & SonarCloud
+name: CI
 
 on:
   push:
-    branches:
-      - '**'
+    branches: [ main, develop ]
   pull_request:
-    branches:
-      - '**'
+    branches: [ main, develop ]
 
 jobs:
   lint:
+    name: Lint
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -19,11 +18,17 @@ jobs:
         run: |
           brew install swiftlint
 
+      - name: Verify SwiftLint config file
+        run: |
+          test -f "$GITHUB_WORKSPACE/.swiftlint.yml"
+          echo "Using config: $GITHUB_WORKSPACE/.swiftlint.yml"
+
       - name: Run SwiftLint
         run: |
-          swiftlint
+          swiftlint lint --config "$GITHUB_WORKSPACE/.swiftlint.yml"
 
   test:
+    name: Unit Tests
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -50,30 +55,3 @@ jobs:
         with:
           name: coverage-report
           path: .build/coverage/coverage.json
-
-  sonarcloud:
-    runs-on: macos-latest
-    needs: [test, lint]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download Coverage Report
-        uses: actions/download-artifact@v5
-        with:
-          name: coverage-report
-          path: .build/coverage/coverage.json
-
-      - name: SonarCloud Scan
-        uses: sonarsource/sonarqube-scan-action@v6
-        with:
-          projectBaseDir: .
-          args: >
-            -Dsonar.projectKey=vilteros-help-review
-            -Dsonar.organization=vvalembois
-            -Dsonar.language=swift
-            -Dsonar.sources=Sources
-            -Dsonar.swift.coverage.reportPaths=.build/coverage/coverage.json
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          waitForQualityGate: true

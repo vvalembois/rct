@@ -167,3 +167,13 @@ class ApiCall: Identifiable {
         }
     }
 }
+
+extension ApiCall: Hashable {
+    static func == (leftHs: ApiCall, rightHs: ApiCall) -> Bool {
+        leftHs.id == rightHs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}

@@ -20,30 +20,48 @@ struct InformationView: View {
         List(viewModel.sections) { data in
             section(section: data)
         }
-        .listStyle(.insetGrouped)
-        .navigationBarTitle("Informations", displayMode: .large)
         .onAppear {
             viewModel.load()
         }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+        .platformNavigationTitle(MenuItem.information.title)
+        #if os(iOS)
+        .platformToolbar(
+            navigationBarLeading: {
                 Button(
                     action: { RCT.sharedInstance().motionDetected() },
                     label: { Label("Close", systemImage: "xmark") }
                 )
+            },
+            navigationBarTrailing: {
+                Button(
+                    action: {  },
+                    label: { Label("Download", systemImage: "square.and.arrow.up") }
+                )
             }
-        }
+        )
+        #elseif os(macOS)
+        .platformToolbar(
+            navigationBarTrailing: {
+                Button(
+                    action: {  },
+                    label: { Label("Download", systemImage: "square.and.arrow.up") }
+                )
+            }
+        )
+        #endif
     }
     
     @ViewBuilder
     func section(section: MySection) -> some View {
-        Section(header: Text(section.name)) {
+        VStack(alignment: .leading) {
+            Text(section.name).bold()
+            
             ForEach(section.informations.indices, id: \.self) { indexInfo in
-                HStack(alignment: .top) {
-                    Text(section.informations[indexInfo].key)
-                    Spacer()
-                    Text((section.informations[indexInfo].value as? String) ?? "")
-                }
+                FieldView(
+                    title: section.informations[indexInfo].key,
+                    value: (section.informations[indexInfo].value as? String) ?? ""
+                )
+                .fieldStyle()
             }
         }
     }

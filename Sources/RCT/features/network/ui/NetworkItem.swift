@@ -33,11 +33,18 @@ struct NetworkItem: View {
             .padding()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.secondarySystemBackground)
         .cornerRadius(20)
     }
 }
 
 #Preview {
-    NetworkItem(apiCall: RCTMock.getMockApiCall())
+    NetworkItem(apiCall: ApiCall(
+        requestURL: "https://api.example.com/v1/users",
+        requestMethod: "GET",
+        requestDate: Date(),
+        requestType: "application/json",
+        requestShortType: .JSON,
+        timeInterval: 0.42
+    ))
 }

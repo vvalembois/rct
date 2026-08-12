@@ -9,7 +9,6 @@ import Foundation
 
 #if os(iOS)
 import UIKit
-#endif
 
 public extension UIDevice {
 
@@ -73,6 +72,7 @@ public extension UIDevice {
             case "iPhone18,4":                                    return "iPhone Air"
             case "iPhone18,1":                                    return "iPhone 17 Pro"
             case "iPhone18,2":                                    return "iPhone 17 Pro Max"
+            case "iPhone18,5":                                    return "iPhone 17e"
             case "iPhone8,4":                                     return "iPhone SE"
             case "iPhone12,8":                                    return "iPhone SE (2nd generation)"
             case "iPhone14,6":                                    return "iPhone SE (3rd generation)"
@@ -95,6 +95,8 @@ public extension UIDevice {
             case "iPad14,10", "iPad14,11":                        return "iPad Air (13-inch) (M2)"
             case "iPad15,3", "iPad15,4":                          return "iPad Air (11-inch) (M3)"
             case "iPad15,5", "iPad15,6":                          return "iPad Air (13-inch) (M3)"
+            case "iPad16,8", "iPad16,9":                          return "iPad Air (11-inch) (M4)"
+            case "iPad16,10", "iPad16,11":                        return "iPad Air (13-inch) (M4)"
             case "iPad2,5", "iPad2,6", "iPad2,7":                 return "iPad mini"
             case "iPad4,4", "iPad4,5", "iPad4,6":                 return "iPad mini 2"
             case "iPad4,7", "iPad4,8", "iPad4,9":                 return "iPad mini 3"
@@ -116,6 +118,8 @@ public extension UIDevice {
             case "iPad13,8", "iPad13,9", "iPad13,10", "iPad13,11":return "iPad Pro (12.9-inch) (5th generation)"
             case "iPad14,5", "iPad14,6":                          return "iPad Pro (12.9-inch) (6th generation)"
             case "iPad16,5", "iPad16,6":                          return "iPad Pro (13-inch) (M4)"
+            case "iPad17,1", "iPad17,2":                          return "iPad Pro (11-inch) (M5)"
+            case "iPad17,3", "iPad17,4":                          return "iPad Pro (13-inch) (M5)"
             case "AppleTV5,3":                                    return "Apple TV"
             case "AppleTV6,2":                                    return "Apple TV 4K"
             case "AudioAccessory1,1":                             return "HomePod"
@@ -141,3 +145,7 @@ public extension UIDevice {
         return mapToDevice(identifier: identifier)
     }()
 }
+
+#elseif os(macOS)
+import AppKit
+#endif
