@@ -32,12 +32,10 @@ public class NetworkManager: @unchecked Sendable {
     }
     
     private func register() {
-        let implementHelpReview = NSSelectorFromString("implementHelpReview")
-        if URLSessionConfiguration.responds(to: implementHelpReview) {
-            URLSessionConfiguration.perform(implementHelpReview)
-        }
+        // Sessions built from `.default` / `.ephemeral` configurations (custom clients, Alamofire…).
+        URLSessionConfigurationCapture.install()
+        // `URLSession.shared` and legacy `NSURLConnection`.
         URLProtocol.registerClass(NetworkProtocol.self)
-
     }
     
     private func unregister() {

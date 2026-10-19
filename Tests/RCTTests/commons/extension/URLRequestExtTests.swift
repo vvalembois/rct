@@ -25,7 +25,7 @@ final class URLRequestExtTests: XCTestCase {
     }
 
     func testGetBodyReadsFromHttpBodyStream() {
-        let data = "stream-body".data(using: .utf8)!
+        let data = Data("stream-body".utf8)
         var request = URLRequest(url: URL(string: "https://example.com")!)
         request.httpBodyStream = InputStream(data: data)
 
@@ -33,7 +33,7 @@ final class URLRequestExtTests: XCTestCase {
     }
 
     func testGetBodyFallsBackToBodyDataProperty() {
-        let data = "fallback-body".data(using: .utf8)!
+        let data = Data("fallback-body".utf8)
         let mutableRequest = NSMutableURLRequest(url: URL(string: "https://example.com")!)
         URLProtocol.setProperty(data, forKey: "BodyData", in: mutableRequest)
         let request = mutableRequest as URLRequest

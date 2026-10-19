@@ -4,7 +4,7 @@ import XCTest
 
 final class InputStreamExtTests: XCTestCase {
     func testReadfullyReadsAllBytes() {
-        let payload = "hello world".data(using: .utf8)!
+        let payload = Data("hello world".utf8)
         let stream = InputStream(data: payload)
 
         let read = stream.readfully()

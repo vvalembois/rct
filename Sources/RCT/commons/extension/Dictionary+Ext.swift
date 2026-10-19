@@ -13,10 +13,8 @@ extension Dictionary where Key == String, Value == String {
     func maskingSensitiveKeys(_ sensitiveKeys: [String]) -> [String: String] {
         var masked = self
         
-        for key in keys {
-            if sensitiveKeys.contains(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) {
-                masked[key] = "****"
-            }
+        for key in keys where sensitiveKeys.contains(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) {
+            masked[key] = "****"
         }
         
         return masked

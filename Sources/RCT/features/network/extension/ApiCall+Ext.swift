@@ -5,22 +5,75 @@
 //  Created by Vincent on 04/10/2025.
 //
 
-import SwiftUI
+import Foundation
+import RCTUI
+
+// MARK: - Presentation
 
 extension ApiCall {
     
-    func getColor() -> Color {
-        switch responseStatus {
-        case .some(200...299):
-            return .green.opacity(0.5)
-        case .some(400...499):
-            return .red.opacity(0.5)
-        case .none:
-            return .gray.opacity(0.5)
-        default:
-            return .gray.opacity(0.5)
+    /// Tone of the call: 2xx success, 3xx notice, 4xx warning, 5xx and failures critical.
+    var statusTone: DSTone {
+        guard let status = responseStatus else { return .critical }
+        switch status {
+        case 200..<300: return .success
+        case 300..<400: return .notice
+        case 400..<500: return .warning
+        default: return .critical
         }
     }
+    
+    /// `200`, `404`… or `Failed` when no response was received.
+    var statusCodeText: String {
+        responseStatus.map { String($0) } ?? "Failed"
+    }
+    
+    /// `201 Created`, or the error message when the call failed.
+    var statusDescription: String {
+        guard let status = responseStatus else { return errorDescription ?? "No Response" }
+        return DSFormat.httpStatus(status)
+    }
+    
+    var method: String {
+        requestMethod ?? "GET"
+    }
+    
+    var host: String {
+        requestURLComponents?.host ?? URL(string: requestURL ?? "")?.host ?? DSFormat.placeholder
+    }
+    
+    var path: String {
+        let path = requestURLComponents?.path ?? ""
+        return path.isEmpty ? "/" : path
+    }
+    
+    var duration: Double? {
+        timeInterval.map { Double($0) }
+    }
+    
+    /// Requests taking one second or more are highlighted.
+    var isSlow: Bool {
+        (duration ?? 0) >= 1
+    }
+    
+    var durationText: String {
+        DSFormat.duration(duration)
+    }
+    
+    var responseSizeText: String {
+        DSFormat.byteCount(responseBodyLength)
+    }
+    
+    var contentTypeText: String {
+        responseShortType?.rawValue ?? responseType ?? DSFormat.placeholder
+    }
+    
+    // MARK: Sort keys (Table columns)
+    
+    var statusSortKey: Int { responseStatus ?? 0 }
+    var durationSortKey: Double { duration ?? -1 }
+    var sizeSortKey: Int { responseBodyLength ?? -1 }
+    var dateSortKey: Date { requestDate ?? .distantPast }
 }
 
 extension ApiCall {
@@ -56,7 +109,7 @@ extension ApiCall {
         return parts.joined(separator: " ")
     }
     
-    // swiftlint:disable cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity
     func toFullLogString(sensitiveKeys: [String] = NetworkManager.shared.sensitiveKeys) -> String {
         var log = [String]()
 

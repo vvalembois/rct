@@ -6,8 +6,7 @@
 //
 
 import Foundation
-import OSLog
-import SwiftUI
+import RCTUI
 
 struct LogEntry: Identifiable, Codable {
     let id = UUID()
@@ -15,12 +14,6 @@ struct LogEntry: Identifiable, Codable {
     var message: String
     var time: TimeInterval
     var className: String
-    
-    var dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss a"
-        return formatter
-    }()
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -29,36 +22,12 @@ struct LogEntry: Identifiable, Codable {
         case className
     }
     
+    var date: Date {
+        Date(timeIntervalSince1970: time)
+    }
+    
     func toString() -> String {
-        let date = Date(timeIntervalSince1970: time)
-        return "[\(type.rawValue)] [\(dateFormatter.string(from: date))]: \(message)"
-    }
-}
-
-extension LogEntry {
-    
-    func getImage() -> String {
-        var systemImage = ""
-        switch type {
-        case .info:
-            systemImage = "info.circle.fill"
-        case .error:
-            systemImage = "exclamationmark.circle.fill"
-        default:
-            systemImage = "ladybug.circle.fill"
-        }
-        return systemImage
-    }
-    
-    func getColor() -> Color {
-        switch type {
-        case .info:
-            return .green.opacity(0.5)
-        case .error:
-            return .red.opacity(0.5)
-        default:
-            return .orange.opacity(0.5)
-        }
+        return "[\(type.rawValue)] [\(DSFormat.time(date))]: \(message)"
     }
 }
 

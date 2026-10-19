@@ -7,7 +7,7 @@
 
 import Foundation
 
-class ApiCall: Identifiable {
+class ApiCall: Identifiable, @unchecked Sendable {
     
     var uuid: UUID = UUID()
     
@@ -39,6 +39,8 @@ class ApiCall: Identifiable {
     var randomHash: String?
     
     var noResponse: Bool = true
+    
+    var errorDescription: String?
     
     init(_ request: URLRequest) {
         self.requestDate = Date()
@@ -123,8 +125,12 @@ class ApiCall: Identifiable {
         self.noResponse = noResponse
     }
 
-    func setToErrorResponse() {
+    func setToErrorResponse(_ error: Error? = nil) {
         self.responseDate = Date()
+        self.errorDescription = error?.localizedDescription
+        if let requestDate, let responseDate {
+            self.timeInterval = Float(responseDate.timeIntervalSince(requestDate))
+        }
     }
     
     func saveResponse(_ response: URLResponse, data: Data) {

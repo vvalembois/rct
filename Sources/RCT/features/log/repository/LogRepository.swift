@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-class LogRepository: ObservableObject {
+final class LogRepository: ObservableObject, @unchecked Sendable {
     
     nonisolated(unsafe) static let shared = LogRepository()
     
@@ -34,11 +34,20 @@ class LogRepository: ObservableObject {
         }
     }
     
+    /// `rct_log` can be called from any thread: published changes are always applied on the main thread.
     func addLog(_ log: LogEntry) {
-        logs.append(log)
+        performOnMain { self.logs.append(log) }
     }
     
     func clear() {
-        logs.removeAll()
+        performOnMain { self.logs.removeAll() }
+    }
+    
+    private func performOnMain(_ block: @escaping @Sendable () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
     }
 }
