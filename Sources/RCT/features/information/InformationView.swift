@@ -5,68 +5,55 @@
 //  Created by Vincent Valembois on 28/09/2025.
 //
 
-import Foundation
 import SwiftUI
+import RCTUI
 
+/// App, device and capture settings, in a native grouped form.
 struct InformationView: View {
-    
-    @ObservedObject var viewModel: InformationViewViewModel
-    
-    init(informationViewViewModel: InformationViewViewModel = InformationViewViewModel()) {
-        self.viewModel = informationViewViewModel
-    }
-    
+
+    @StateObject private var viewModel = InformationViewModel()
+    @State private var isCapturing = RCT.sharedInstance().started
+
     var body: some View {
-        List(viewModel.sections) { data in
-            section(section: data)
-        }
-        .onAppear {
-            viewModel.load()
-        }
-        .platformNavigationTitle(MenuItem.information.title)
-        #if os(iOS)
-        .platformToolbar(
-            navigationBarLeading: {
-                Button(
-                    action: { RCT.sharedInstance().motionDetected() },
-                    label: { Label("Close", systemImage: "xmark") }
-                )
-            },
-            navigationBarTrailing: {
-                Button(
-                    action: {  },
-                    label: { Label("Download", systemImage: "square.and.arrow.up") }
-                )
+        Form {
+            ForEach(viewModel.sections) { section in
+                Section(section.title) {
+                    ForEach(section.rows) { infoRow in
+                        DSKeyValueRow(infoRow.title, value: infoRow.value)
+                    }
+                }
             }
-        )
-        #elseif os(macOS)
-        .platformToolbar(
-            navigationBarTrailing: {
-                Button(
-                    action: {  },
-                    label: { Label("Download", systemImage: "square.and.arrow.up") }
-                )
+
+            Section {
+                Toggle("Capture", isOn: $isCapturing)
+                DSKeyValueRow("Masked Keys", value: viewModel.maskedKeys)
+            } header: {
+                Text("Capture")
+            } footer: {
+                Text("Turning capture off stops recording and clears captured calls. Masked keys are hidden in headers, bodies and exports.")
             }
-        )
-        #endif
-    }
-    
-    @ViewBuilder
-    func section(section: MySection) -> some View {
-        VStack(alignment: .leading) {
-            Text(section.name).bold()
-            
-            ForEach(section.informations.indices, id: \.self) { indexInfo in
-                FieldView(
-                    title: section.informations[indexInfo].key,
-                    value: (section.informations[indexInfo].value as? String) ?? ""
-                )
-                .fieldStyle()
+        }
+        .formStyle(.grouped)
+        .dsOnChange(of: isCapturing) { isOn in
+            if isOn {
+                RCT.sharedInstance().start()
+            } else {
+                RCT.sharedInstance().stop()
+            }
+        }
+        .dsNavigationTitle(MenuItem.information.title)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: viewModel.report) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
             }
         }
     }
 }
 
 #Preview {
-    InformationView()
+    NavigationStack {
+        InformationView()
+    }
 }

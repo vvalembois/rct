@@ -1,5 +1,6 @@
 import XCTest
 @testable import RCT
+import RCTUI
 
 final class LogTests: XCTestCase {
     func testToStringIncludesTypeTimeAndMessage() {
@@ -11,10 +12,15 @@ final class LogTests: XCTestCase {
         XCTAssertTrue(text.contains("Hello"))
     }
 
-    func testGetImageReturnsExpectedSymbolName() {
-        XCTAssertEqual(LogEntry(type: .info, message: "", time: 0, className: "").getImage(), "info.circle.fill")
-        XCTAssertEqual(LogEntry(type: .error, message: "", time: 0, className: "").getImage(), "exclamationmark.circle.fill")
-        XCTAssertEqual(LogEntry(type: .warning, message: "", time: 0, className: "").getImage(), "ladybug.circle.fill")
+    func testToneMatchesLevel() {
+        XCTAssertEqual(LogEntry(type: .info, message: "", time: 0, className: "").tone, .info)
+        XCTAssertEqual(LogEntry(type: .warning, message: "", time: 0, className: "").tone, .warning)
+        XCTAssertEqual(LogEntry(type: .error, message: "", time: 0, className: "").tone, .critical)
+    }
+
+    func testContextFallsBackToApp() {
+        XCTAssertEqual(LogEntry(type: .info, message: "", time: 0, className: "").contextText, "App")
+        XCTAssertEqual(LogEntry(type: .info, message: "", time: 0, className: "Service").contextText, "Service")
     }
 
     func testPersistableMappingRoundTrip() {

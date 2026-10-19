@@ -1,241 +1,310 @@
 //
-//  Untitled.swift
+//  NetworkDetailView.swift
 //  RCT
 //
 //  Created by Vincent on 02/10/2025.
 //
 
 import SwiftUI
+import RCTUI
 
+/// Detail of a captured call, shared by iPhone (pushed), iPad (detail column)
+/// and Mac (inspector, `isEmbedded`).
 struct NetworkDetailView: View {
-    
-    @State private var section = 0
-    
-    @State private var sectionBody = 0
-    
-    @State private var showOptions = false
-    
-    let apiCall: ApiCall
+
+    enum DetailTab: String, CaseIterable, Identifiable {
+        case overview
+        case request
+        case response
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .overview: return "Overview"
+            case .request: return "Request"
+            case .response: return "Response"
+            }
+        }
+    }
+
+    let call: ApiCall
+
+    /// When embedded (Mac inspector) the view does not set a navigation title nor toolbar items.
+    var isEmbedded = false
+
+    @State private var selectedTab: DetailTab = .overview
 
     var body: some View {
-        VStack {
-            Picker("", selection: $section) {
-                Text("Information").tag(0)
-                Text("Request").tag(1)
-                Text("Response").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
+        if isEmbedded {
+            content
+        } else {
+            content
+                .dsNavigationTitle("\(call.method) \(call.path)", subtitle: call.host, displayMode: .inline)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        shareMenu
+                    }
+                }
+        }
+    }
 
-            switch section {
-            case 0:
-                infoView
-            case 1:
-                requestView
-            case 2:
-                responseView
-            default:
-                EmptyView()
-            }
-        }
-        #if os(iOS)
-        .platformToolbar(
-            navigationBarTrailing: {
-                exportButton
-            }
-        )
-        #elseif os(macOS)
-        .platformToolbar(
-            navigation: true,
-            navigationBarTrailing: {
-                exportButton
-            }
-        )
-        #endif
-        
-    }
-    
-    private var exportButton: some View {
-        Button(
-            action: { showOptions = true },
-            label: { Label("Download", systemImage: "square.and.arrow.up") }
-        )
-        .confirmationDialog(
-            "",
-            isPresented: $showOptions,
-            titleVisibility: .hidden
-        ) {
-            Button("Curl") {
-                ShareSheet.share(items: [IdentifiableObject(value: apiCall.toCurl())])
-            }
-            Button("Export log") {
-                ShareSheet.share(items: [IdentifiableObject(value: apiCall.toFullLogString())])
-            }
-            Button("Export File log") {
-                guard let file = apiCall.toLogFile() else { return }
-                ShareSheet.share(items: [IdentifiableObject(value: file)])
-            }
-            Button("Cancel", role: .cancel) {
-                // Cancel action
-            }
-        }
-    }
-    
-    private var infoView: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                FieldView(title: "Url", value: apiCall.requestURL ?? "")
-                    .fieldStyle()
-                
-                HStack(spacing: 20) {
-                    if let status = apiCall.responseStatus {
-                        FieldView(title: "Status", value: "\(status)")
-                            .fieldStyle(color: apiCall.getColor())
-                            .foregroundStyle(.white)
+    private var content: some View {
+        Form {
+            Section {
+                Picker("Section", selection: $selectedTab) {
+                    ForEach(DetailTab.allCases) { detailTab in
+                        Text(detailTab.title).tag(detailTab)
                     }
-                    
-                    FieldView(title: "Method", value: apiCall.requestMethod ?? "")
-                        .fieldStyle()
                 }
-                
-                FieldView(title: "Request Date", value: apiCall.requestDate?.formatted() ?? "")
-                    .fieldStyle()
-                
-                FieldView(title: "Response Date", value: apiCall.responseDate?.formatted() ?? "")
-                    .fieldStyle()
-                
-                FieldView(title: "Time interval", value: apiCall.timeInterval?.formatted() ?? "")
-                    .fieldStyle()
-                
-                FieldView(title: "Cache policy", value: apiCall.requestCachePolicy ?? "")
-                    .fieldStyle()
-            }
-            .padding()
-        }
-    }
-    
-    private var requestView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if let headers = apiCall.requestHeaders, !headers.isEmpty {
-                    sectionHeader(title: "Headers", fields: headers)
-                } else {
-                    sectionHeader(title: "Headers", fields: [:])
-                }
-                
-                if let body = apiCall.requestBody, !body.isEmpty {
-                    sectionBody(title: "Body", type: apiCall.requestShortType ?? .OTHER, value: body)
-                } else {
-                    sectionBody(title: "Body", type: .OTHER, value: "")
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            } header: {
+                if isEmbedded {
+                    embeddedHeader
                 }
             }
-            .padding()
-        }
-    }
-    
-    private var responseView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if let headers = apiCall.responseHeaders, !headers.isEmpty {
-                    sectionHeader(title: "Headers", fields: headers)
-                } else {
-                    sectionHeader(title: "Headers", fields: [:])
-                }
-                
-                if let body = apiCall.responseBody, !body.isEmpty {
-                    sectionBody(title: "Body", type: apiCall.responseShortType ?? .OTHER, value: body)
-                } else {
-                    sectionBody(title: "Body", type: .OTHER, value: "")
-                }
-            }
-            .padding()
-        }
-    }
-    
-    @ViewBuilder
-    func sectionHeader(title: String, fields: [String: String]) -> some View {
-        VStack(alignment: .leading) {
-            Text(title).bold()
-            
-            ForEach(fields.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                FieldView(
-                    title: key,
-                    value: value
+
+            switch selectedTab {
+            case .overview:
+                NetworkOverviewSections(call: call)
+            case .request:
+                NetworkMessageSections(
+                    headers: call.requestHeaders,
+                    bodyText: call.requestBody,
+                    type: call.requestShortType,
+                    contentType: call.requestType
                 )
-                .fieldStyle()
+            case .response:
+                NetworkMessageSections(
+                    headers: call.responseHeaders,
+                    bodyText: call.responseBody,
+                    type: call.responseShortType,
+                    contentType: call.responseType
+                )
             }
         }
+        .formStyle(.grouped)
     }
-    
-    @ViewBuilder
-    func sectionBody(title: String, type: ApiCallType, value: String) -> some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(title).bold()
-                Spacer()
-                
-                if type == .HTML {
-                    Picker("", selection: $sectionBody) {
-                        Text("Preview").tag(0)
-                        Text("Raw").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
+
+    private var embeddedHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: DSSpacing.xxSmall) {
+                Text("\(call.method) \(call.path)")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                Text(call.host)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            shareMenu
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .fixedSize()
+        }
+        .textCase(nil)
+        .padding(.bottom, DSSpacing.small)
+    }
+
+    private var shareMenu: some View {
+        Menu {
+            Button {
+                DSPasteboard.copy(call.toCurl())
+            } label: {
+                Label("Copy as cURL", systemImage: "terminal")
+            }
+            Button {
+                DSPasteboard.copy(call.requestURL ?? "")
+            } label: {
+                Label("Copy URL", systemImage: "link")
+            }
+            Divider()
+            ShareLink(item: call.toCurl()) {
+                Label("Share cURL", systemImage: "square.and.arrow.up")
+            }
+            ShareLink(item: call.toFullLogString()) {
+                Label("Share Full Log", systemImage: "doc.text")
+            }
+        } label: {
+            Label("Share", systemImage: "square.and.arrow.up")
+        }
+    }
+}
+
+// MARK: - Overview
+
+private struct NetworkOverviewSections: View {
+
+    let call: ApiCall
+
+    var body: some View {
+        Section {
+            DSKeyValueRow("Status", value: call.statusDescription, tone: call.statusTone)
+            DSKeyValueRow("Method", value: call.method)
+            DSKeyValueRow("Duration", value: call.durationText, tone: call.isSlow ? .warning : nil)
+            DSKeyValueRow("Response Size", value: call.responseSizeText)
+            DSKeyValueRow("Content Type", value: call.responseType ?? DSFormat.placeholder)
+        }
+
+        Section("URL") {
+            Text(call.requestURL ?? DSFormat.placeholder)
+                .font(.dsCode)
+                .textSelection(.enabled)
+                .dsCopyable(call.requestURL ?? "", title: "Copy URL")
+        }
+
+        if let queryItems = call.requestURLQueryItems, !queryItems.isEmpty {
+            Section("Query") {
+                ForEach(Array(queryItems.enumerated()), id: \.offset) { _, item in
+                    DSKeyValueRow(item.name, value: item.value ?? "", layout: .stacked, monospaced: true)
                 }
             }
-            
-            if (!value.isEmpty) {
-                switch type {
-                case .JSON:
-                    Text(value.toPretty())
-                        .font(.system(.caption, design: .monospaced))
-                        .padding()
-                case .XML:
-                    Text(value)
-                        .font(.system(.body, design: .monospaced))
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                case .HTML:
-                    if sectionBody == 0 {
-                        WebView(html: value)
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(10/16, contentMode: .fit)
-                            .cornerRadius(20)
-                    } else {
-                        Text(value.toPretty())
-                            .font(.system(.caption, design: .monospaced))
-                            .padding()
-                    }
-                case .IMAGE:
-                    value.toImage()?
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: .infinity)
-                        .aspectRatio(1, contentMode: .fit)
-                        .cornerRadius(20)
-                case .OTHER:
-                    Text(value)
-                        .font(.system(.body, design: .monospaced))
-                        .padding()
+        }
+
+        Section("Timing") {
+            DSKeyValueRow("Started", value: DSFormat.dateTime(call.requestDate))
+            DSKeyValueRow("Ended", value: DSFormat.dateTime(call.responseDate))
+            DSKeyValueRow("Timeout", value: call.requestTimeout.map { "\($0) s" } ?? DSFormat.placeholder)
+            DSKeyValueRow("Cache Policy", value: call.requestCachePolicy ?? DSFormat.placeholder)
+        }
+
+        if let error = call.errorDescription {
+            Section("Error") {
+                Label {
+                    Text(error)
+                        .textSelection(.enabled)
+                } icon: {
+                    DSToneIcon(.critical)
                 }
             }
         }
     }
 }
 
+// MARK: - Request / Response
+
+private struct NetworkMessageSections: View {
+
+    private struct Header: Identifiable {
+        let key: String
+        let value: String
+        var id: String { key }
+    }
+
+    let headers: [String: String]?
+    let bodyText: String?
+    let type: ApiCallType?
+    let contentType: String?
+
+    @State private var showsRaw = false
+
+    private var sensitiveKeys: [String] { NetworkManager.shared.sensitiveKeys }
+
+    private var sortedHeaders: [Header] {
+        (headers ?? [:])
+            .maskingSensitiveKeys(sensitiveKeys)
+            .map { Header(key: $0.key, value: $0.value) }
+            .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+    }
+
+    private var maskedBody: String {
+        (bodyText ?? "").maskingSensitiveKeys(sensitiveKeys)
+    }
+
+    private var bodyType: ApiCallType { type ?? .OTHER }
+
+    var body: some View {
+        Section {
+            if sortedHeaders.isEmpty {
+                Text("No Headers")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(sortedHeaders) { header in
+                    DSKeyValueRow(header.key, value: header.value, layout: .stacked, monospaced: true)
+                }
+            }
+        } header: {
+            Text(sortedHeaders.isEmpty ? "Headers" : "Headers (\(sortedHeaders.count))")
+        }
+
+        Section {
+            if maskedBody.isEmpty {
+                Text("No Body")
+                    .foregroundStyle(.secondary)
+            } else {
+                bodyContent
+            }
+        } header: {
+            HStack {
+                Text(contentType.map { "Body · \($0)" } ?? "Body")
+                Spacer()
+                if !maskedBody.isEmpty {
+                    if bodyType == .JSON || bodyType == .HTML {
+                        Button(showsRaw ? (bodyType == .HTML ? "Preview" : "Pretty") : "Raw") {
+                            showsRaw.toggle()
+                        }
+                    }
+                    Button("Copy") {
+                        DSPasteboard.copy(maskedBody)
+                    }
+                }
+            }
+            .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
+        switch bodyType {
+        case .JSON:
+            if showsRaw {
+                DSCodeBlock(maskedBody)
+            } else {
+                DSCodeBlock(maskedBody.toPretty(), language: .json)
+            }
+        case .HTML:
+            if showsRaw {
+                DSCodeBlock(maskedBody)
+            } else {
+                DSWebView(html: maskedBody)
+                    .frame(minHeight: 420)
+                    .listRowInsets(EdgeInsets())
+            }
+        case .IMAGE:
+            if let image = maskedBody.toImage() {
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: 360)
+            } else {
+                Text("Unable to decode the image.")
+                    .foregroundStyle(.secondary)
+            }
+        case .XML, .OTHER:
+            DSCodeBlock(maskedBody)
+        }
+    }
+}
+
 #Preview {
-    NavigationView {
-        NetworkDetailView(apiCall: ApiCall(
+    NavigationStack {
+        NetworkDetailView(call: ApiCall(
             requestURL: "https://api.example.com/v1/users?page=1",
             requestMethod: "POST",
             requestDate: Date(),
+            requestHeaders: ["Content-Type": "application/json", "Authorization": "Bearer token"],
             requestBody: "{\"name\":\"John\"}",
             requestType: "application/json",
             requestShortType: .JSON,
-            responseStatus: 200,
+            responseStatus: 201,
             responseDate: Date(),
             responseHeaders: ["Content-Type": "application/json"],
-            responseBody: "{\"ok\":true}",
+            responseBodyLength: 214,
+            responseBody: "{\"id\":42,\"name\":\"John\",\"verified\":false}",
             responseType: "application/json",
             responseShortType: .JSON,
             timeInterval: 1.24,

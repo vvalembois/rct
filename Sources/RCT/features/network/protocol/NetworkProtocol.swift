@@ -11,7 +11,10 @@ class NetworkProtocol: URLProtocol, @unchecked Sendable {
     private static let internalKey = "com.helpReview.internal"
     
     private lazy var session: URLSession = { [weak self] in
-        return URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        // The forwarding session must not capture its own requests.
+        let configuration = URLSessionConfiguration.default
+        configuration.removeCaptureProtocol()
+        return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }()
     
     private var model: ApiCall?
@@ -102,7 +105,7 @@ extension NetworkProtocol: URLSessionDataDelegate {
         }
 
         if error != nil {
-            model?.setToErrorResponse()
+            model?.setToErrorResponse(error)
         } else if let response = response {
             let data = (responseData ?? NSMutableData()) as Data
             model?.saveResponse(response, data: data)

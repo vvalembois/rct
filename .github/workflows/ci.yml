@@ -6,52 +6,53 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
-    runs-on: macos-latest
+    runs-on: xcode-27
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - name: Install SwiftLint
-        run: |
-          brew install swiftlint
-
-      - name: Verify SwiftLint config file
-        run: |
-          test -f "$GITHUB_WORKSPACE/.swiftlint.yml"
-          echo "Using config: $GITHUB_WORKSPACE/.swiftlint.yml"
+        run: which swiftlint || brew install swiftlint
 
       - name: Run SwiftLint
-        run: |
-          swiftlint lint --config "$GITHUB_WORKSPACE/.swiftlint.yml"
+        run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
   test:
-    name: Unit Tests
-    runs-on: macos-latest
+    name: Tests
+    needs: lint
+    runs-on: xcode-27
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
-      - name: Install Swift
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '6.1.0'
+      - name: Build and test (macOS)
+        run: swift test
 
-      - name: Run Unit Tests
+      - name: Build and test (iOS Simulator)
         run: |
-          FIRST_IPHONE_UDID=$(xcrun simctl list devices available | grep "iPhone" | head -n 1 | awk -F '[()]' '{print $2}')
-          xcodebuild test -scheme RCT -destination "id=$FIRST_IPHONE_UDID" -enableCodeCoverage YES
-          
-      - name: Export Coverage to JSON
-        run: |
-          mkdir -p .build/coverage
-          XCRESULT=$(find ~/Library/Developer/Xcode/DerivedData -name "*.xcresult" | sort | tail -n 1)
-          xcrun xccov view --report --json "$XCRESULT" > .build/coverage/coverage.json
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in d for x in d[r] if "iOS" in r and x["name"].startswith("iPhone")))')
+          SCHEME=$(xcodebuild -list -json \
+            | python3 -c 'import json,sys; s=json.load(sys.stdin)["workspace"]["schemes"]; print("RCT-Package" if "RCT-Package" in s else "RCT")')
+          xcodebuild test \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult
 
-      - name: Upload Coverage Report
+      - name: Export coverage
+        if: success()
+        run: xcrun xccov view --report --json TestResults.xcresult > coverage.json
+
+      - name: Upload coverage
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: .build/coverage/coverage.json
+          path: coverage.json

@@ -4,102 +4,105 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version semver optionnelle (ex: 1.2.3)"
+        description: "Version semver optionnelle (ex: 1.2.3). Vide : minor suivante."
         required: false
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
   create-tag:
-    name: Create Semver Tag
+    name: Create Tag
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Compute release tag
+      - name: Compute version
         id: version
-        shell: bash
+        env:
+          REQUESTED: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-
           git fetch --tags --force
 
-          requested_version="${{ github.event.inputs.version }}"
-          requested_version="$(echo "$requested_version" | xargs)"
-          current_tag=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          requested="$(echo "${REQUESTED}" | xargs)"
+          latest=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
 
-          if [[ -n "$requested_version" ]]; then
-            # Accept optional leading v from manual input, but normalize to X.Y.Z.
-            next_tag="${requested_version#v}"
-
-            if ! [[ "$next_tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Invalid version format: $next_tag" >&2
-              echo "Expected format: 1.2.3" >&2
+          if [[ -n "$requested" ]]; then
+            tag="${requested#v}"
+            if ! [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid version '$tag' (expected X.Y.Z)"
               exit 1
             fi
+          elif [[ -z "$latest" ]]; then
+            tag="1.0.0"
           else
-            if [[ -z "${current_tag}" ]]; then
-              next_tag="1.0.0"
-            else
-              version="${current_tag}"
-              IFS='.' read -r major minor patch <<< "${version}"
-              next_minor=$((minor + 1))
-              next_tag="${major}.${next_minor}.0"
-            fi
+            IFS='.' read -r major minor _ <<< "$latest"
+            tag="${major}.$((minor + 1)).0"
           fi
 
-          existing_on_head=$(git tag --points-at HEAD | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          tag_exists=$(git tag --list "$next_tag" | head -n 1 || true)
-
-          should_create="true"
-          if [[ -n "$tag_exists" ]]; then
-            should_create="false"
-          fi
-
-          echo "requested_version=${requested_version}" >> "$GITHUB_OUTPUT"
-          echo "current_tag=${current_tag}" >> "$GITHUB_OUTPUT"
-          echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
-          echo "existing_on_head=${existing_on_head}" >> "$GITHUB_OUTPUT"
-          echo "tag_exists=${tag_exists}" >> "$GITHUB_OUTPUT"
-          echo "should_create=${should_create}" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "exists=$(git tag --list "$tag" | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: ${latest:-none} → release tag: $tag"
 
       - name: Create and push tag
-        if: steps.version.outputs.should_create == 'true'
+        if: steps.version.outputs.exists == 'false'
         env:
-          TAG_NAME: ${{ steps.version.outputs.next_tag }}
-        shell: bash
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
 
       - name: Summary
-        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          EXISTS: ${{ steps.version.outputs.exists }}
         run: |
-          {
-            echo "### Release Tag"
-            echo ""
-            echo "- Requested version: ${{ steps.version.outputs.requested_version || 'none' }}"
-            echo "- Current latest tag: ${{ steps.version.outputs.current_tag || 'none' }}"
-            echo "- Computed next tag: ${{ steps.version.outputs.next_tag }}"
-            if [[ -n "${{ steps.version.outputs.tag_exists }}" ]]; then
-              echo "- Skipped: tag already exists (${{ steps.version.outputs.tag_exists }})"
-            else
-              echo "- Tag pushed: ${{ steps.version.outputs.next_tag }}"
-            fi
-            if [[ -n "${{ steps.version.outputs.existing_on_head }}" ]]; then
-              echo "- Existing semver tag already on this commit: ${{ steps.version.outputs.existing_on_head }}"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$EXISTS" == "true" ]]; then
+            echo "### Tag $TAG already exists, archives will be re-attached" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Tag $TAG created" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  archive:
+    name: Build SPM Archive & Attach to Release
+    needs: create-tag
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.create-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.create-tag.outputs.tag }}
+
+      - name: Create archives
+        run: |
+          set -euo pipefail
+          BASE_NAME="RCT-${TAG}-spm"
+          FILES="Package.swift README.md LICENSE Sources Tests"
+          mkdir -p dist
+          tar -czf "dist/${BASE_NAME}.tar.gz" $FILES
+          zip -qr "dist/${BASE_NAME}.zip" $FILES
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "RCT $TAG" --generate-notes --verify-tag
+          fi
